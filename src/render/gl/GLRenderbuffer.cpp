@@ -85,8 +85,8 @@ CGLRenderbuffer::CGLRenderbuffer(SP<Aquamarine::IBuffer> buffer, uint32_t format
                         const bool validDescriptors = std::all_of(fds, fds + planes, [](int fd) { return fd >= 0; });
                         m_gpuExported = validDescriptors && buffer->setPresentationDMABUF(attrs);
                         if (m_gpuExported)
-                            Log::logger->log(Log::INFO, "rb: GPU presentation export ready: format 0x{:08x}, modifier 0x{:016x}, {} plane(s)",
-                                             attrs.format, attrs.modifier, attrs.planes);
+                            LOG(Log::INFO, "rb: GPU presentation export ready: format 0x{:08x}, modifier 0x{:016x}, {} plane(s)",
+                                attrs.format, attrs.modifier, attrs.planes);
                         else
                             Log::logger->log(Log::WARN, "rb: GPU presentation export returned invalid DMA-BUF descriptors; retaining SHM output");
                         for (int i = 0; i < planes; ++i) {
@@ -167,7 +167,7 @@ void CGLRenderbuffer::unbind() {
         // no changed pixels. Every buffer in the rotating swapchain has already
         // received its buffer-age damage by that point, so neither map nor read
         // the 1920x1200 SHM image again.
-        if (damageOnly && g_pHyprRenderer->m_renderData.damage.empty()) {
+        if (damageOnly && g_pHyprRenderer->context().m_data.damage.empty()) {
             GLFB(m_framebuffer)->unbind();
             return;
         }
@@ -208,7 +208,7 @@ void CGLRenderbuffer::unbind() {
         // the bounding rectangle touched by this frame.  GL_PACK_ROW_LENGTH
         // writes it directly into the full-stride Wayland SHM image.
         if (damageOnly) {
-            const auto extents = g_pHyprRenderer->m_renderData.damage.copy()
+            const auto extents = g_pHyprRenderer->context().m_data.damage.copy()
                                      .intersect(0, 0, shm.size.x, shm.size.y)
                                      .getExtents()
                                      .round();
@@ -236,7 +236,7 @@ void CGLRenderbuffer::unbind() {
             totalUs += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started).count();
             totalBytes += static_cast<uint64_t>(w) * static_cast<uint64_t>(h) * 4;
             if (++frameCount % 120 == 0) {
-                Log::logger->log(Log::INFO, "SHM readback: avg {} us, avg {} KiB over {} frames", totalUs / frameCount, totalBytes / frameCount / 1024, frameCount);
+                LOG(Log::INFO, "SHM readback: avg {} us, avg {} KiB over {} frames", totalUs / frameCount, totalBytes / frameCount / 1024, frameCount);
             }
         }
     }
