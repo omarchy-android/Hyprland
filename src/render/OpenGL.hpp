@@ -327,9 +327,9 @@ namespace Render::GL {
         SP<CShader>                      m_finalScreenShader;
         GLuint                           m_currentProgram;
 
-        void                             initDRMFormats();
-        void                             initEGL(bool gbm);
-        EGLDeviceEXT                     eglDeviceFromDRMFD(int drmFD);
+void                    initDRMFormats();
+        void                    initEGL(bool gbm, bool surfaceless = false);
+        EGLDeviceEXT            eglDeviceFromDRMFD(int drmFD);
 
         // for the final shader
         std::array<CTimer, POINTER_PRESSED_HISTORY_LENGTH>   m_pressedHistoryTimers    = {};
