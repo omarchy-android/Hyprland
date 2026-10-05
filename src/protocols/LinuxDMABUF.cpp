@@ -15,6 +15,7 @@
 #include "../Compositor.hpp"
 #include "../event/EventBus.hpp"
 #include "../state/MonitorState.hpp"
+#include "../helpers/env/Env.hpp"
 
 using namespace Hyprutils::OS;
 

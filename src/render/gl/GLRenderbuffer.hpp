@@ -14,7 +14,10 @@ namespace Render::GL {
         void unbind() override;
 
       private:
-        void*  m_image = nullptr;
-        GLuint m_rbo   = 0;
+        void*  m_image     = nullptr;
+        void*  m_exportImage = nullptr;
+        GLuint m_rbo       = 0;
+        bool   m_shmBacked = false;
+        bool   m_gpuExported = false;
     };
 }

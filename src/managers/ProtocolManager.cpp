@@ -76,6 +76,7 @@
 #include "../event/EventBus.hpp"
 #include "../render/Renderer.hpp"
 #include "../Compositor.hpp"
+#include "../helpers/env/Env.hpp"
 #include "content-type-v1.hpp"
 
 #include <aquamarine/buffer/Buffer.hpp>
@@ -256,8 +257,16 @@ CProtocolManager::CProtocolManager() {
     }
 
     if (!g_pHyprRenderer->getDRMFormats().empty()) {
-        PROTO::mesaDRM  = makeUnique<CMesaDRMProtocol>(&wl_drm_interface, 2, "MesaDRM");
-        PROTO::linuxDma = makeUnique<CLinuxDMABufV1Protocol>(&zwp_linux_dmabuf_v1_interface, 5, "LinuxDMABUF");
+        // Android/KGSL has DMA-BUF import/export but no DRM node that can
+        // provide v4 feedback's main_device. Advertise the complete legacy v3
+        // format/modifier path instead; this is also what the parent Weston
+        // exposes in Termux:X11.
+        const bool androidDMABUF = Env::envEnabled("HYPRLAND_ANDROID_DMABUF");
+        if (!androidDMABUF)
+            PROTO::mesaDRM = makeUnique<CMesaDRMProtocol>(&wl_drm_interface, 2, "MesaDRM");
+
+        const int dmabufVersion = androidDMABUF ? 3 : 5;
+        PROTO::linuxDma         = makeUnique<CLinuxDMABufV1Protocol>(&zwp_linux_dmabuf_v1_interface, dmabufVersion, "LinuxDMABUF");
     } else
         Log::logger->log(Log::WARN, "ProtocolManager: Not binding linux-dmabuf and MesaDRM: DMABUF not available");
 }

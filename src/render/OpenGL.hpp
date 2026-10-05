@@ -272,6 +272,8 @@ namespace Render::GL {
             PFNEGLDESTROYSYNCKHRPROC                      eglDestroySyncKHR                      = nullptr;
             PFNEGLDUPNATIVEFENCEFDANDROIDPROC             eglDupNativeFenceFDANDROID             = nullptr;
             PFNEGLWAITSYNCKHRPROC                         eglWaitSyncKHR                         = nullptr;
+            PFNEGLEXPORTDMABUFIMAGEQUERYMESAPROC          eglExportDMABUFImageQueryMESA          = nullptr;
+            PFNEGLEXPORTDMABUFIMAGEMESAPROC               eglExportDMABUFImageMESA               = nullptr;
         } m_proc;
 
         struct {

@@ -149,7 +149,7 @@ static ShaderFeatureFlags globalFeatures() {
         0;
 }
 
-void CHyprOpenGLImpl::initEGL(bool gbm) {
+void CHyprOpenGLImpl::initEGL(bool gbm, bool surfaceless) {
     std::vector<EGLint> attrs;
     if (m_exts.KHR_display_reference) {
         attrs.push_back(EGL_TRACK_REFERENCES_KHR);
@@ -158,7 +158,10 @@ void CHyprOpenGLImpl::initEGL(bool gbm) {
 
     attrs.push_back(EGL_NONE);
 
-    m_eglDisplay = m_proc.eglGetPlatformDisplayEXT(gbm ? EGL_PLATFORM_GBM_KHR : EGL_PLATFORM_DEVICE_EXT, gbm ? m_gbmDevice : m_eglDevice, attrs.data());
+    const auto platform = surfaceless ? EGL_PLATFORM_SURFACELESS_MESA : (gbm ? EGL_PLATFORM_GBM_KHR : EGL_PLATFORM_DEVICE_EXT);
+    void* const nativeDisplay = surfaceless ? EGL_DEFAULT_DISPLAY : (gbm ? m_gbmDevice : m_eglDevice);
+
+    m_eglDisplay = m_proc.eglGetPlatformDisplayEXT(platform, nativeDisplay, attrs.data());
     if (m_eglDisplay == EGL_NO_DISPLAY)
         RASSERT(false, "EGL: failed to create a platform display");
 
@@ -305,6 +308,8 @@ CHyprOpenGLImpl::CHyprOpenGLImpl() : m_drmFD(g_pCompositor->m_drmRenderNode.fd >
     loadGLProc(&m_proc.eglDestroySyncKHR, "eglDestroySyncKHR");
     loadGLProc(&m_proc.eglDupNativeFenceFDANDROID, "eglDupNativeFenceFDANDROID");
     loadGLProc(&m_proc.eglWaitSyncKHR, "eglWaitSyncKHR");
+    loadGLProc(&m_proc.eglExportDMABUFImageQueryMESA, "eglExportDMABUFImageQueryMESA");
+    loadGLProc(&m_proc.eglExportDMABUFImageMESA, "eglExportDMABUFImageMESA");
 
     RASSERT(m_proc.eglCreateSyncKHR, "Display driver doesn't support eglCreateSyncKHR");
     RASSERT(m_proc.eglDupNativeFenceFDANDROID, "Display driver doesn't support eglDupNativeFenceFDANDROID");
@@ -330,7 +335,13 @@ CHyprOpenGLImpl::CHyprOpenGLImpl() : m_drmFD(g_pCompositor->m_drmRenderNode.fd >
     RASSERT(eglBindAPI(EGL_OPENGL_ES_API) != EGL_FALSE, "Couldn't bind to EGL's opengl ES API. This means your gpu driver f'd up. This is not a hyprland issue.");
 
     bool success = false;
-    if (EGLEXTENSIONS.contains("EXT_platform_device") || !m_proc.eglQueryDevicesEXT || !m_proc.eglQueryDeviceStringEXT) {
+    if (Env::envEnabled("HYPRLAND_EGL_SURFACELESS") && EGLEXTENSIONS.contains("EGL_MESA_platform_surfaceless")) {
+        Log::logger->log(Log::WARN, "EGL: using the requested surfaceless platform");
+        success = true;
+        initEGL(false, true);
+    }
+
+    if (!success && (EGLEXTENSIONS.contains("EXT_platform_device") || !m_proc.eglQueryDevicesEXT || !m_proc.eglQueryDeviceStringEXT)) {
         m_eglDevice = eglDeviceFromDRMFD(m_drmFD);
 
         if (m_eglDevice != EGL_NO_DEVICE_EXT) {
@@ -2670,6 +2681,19 @@ WP<CShader> CHyprOpenGLImpl::getShaderVariant(ePreparedFragmentShader frag, Shad
 }
 
 std::vector<SDRMFormat> CHyprOpenGLImpl::getDRMFormats() {
+    // Mesa's KGSL surfaceless display can import DMA-BUFs even when its EGL
+    // format query returns an empty list. The nested output already uses this
+    // exact linear 32-bit path. Chromium/ANGLE exports RGBA8 as ABGR8888, so
+    // include that linear format as well instead of rejecting its wl_buffer
+    // before EGL gets a chance to perform the real import validation.
+    if (m_drmFormats.empty() && Env::envEnabled("HYPRLAND_ANDROID_DMABUF")) {
+        return {
+            SDRMFormat{.drmFormat = DRM_FORMAT_XRGB8888, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_ARGB8888, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+            SDRMFormat{.drmFormat = DRM_FORMAT_ABGR8888, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+        };
+    }
+
     return m_drmFormats;
 }
 
